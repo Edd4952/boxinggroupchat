@@ -1,29 +1,42 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
+import { DarkTheme, DefaultTheme, ThemeProvider as NavThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
-import { Stack } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import 'react-native-reanimated';
+import { Stack } from "expo-router";
+import { Switch } from 'react-native';
+import { ThemeProvider, colorsFor, useThemeMode } from './theme';
 
-import { useColorScheme } from '@/hooks/useColorScheme';
+function RootStackInner() {
+  const { mode, toggle } = useThemeMode();
+  const c = colorsFor(mode);
+  const navTheme = mode === 'dark' ? DarkTheme : DefaultTheme;
 
-export default function RootLayout() {
-  const colorScheme = useColorScheme();
+  return (
+    <NavThemeProvider value={navTheme}>
+      <Stack
+        screenOptions={{
+          headerStyle: { backgroundColor: c.headerBg },
+          headerTintColor: c.tint,
+          contentStyle: { backgroundColor: c.bg },
+          headerRight: () => (
+            <Switch style={{ marginRight: 8 }} value={mode === 'dark'} onValueChange={toggle} />
+          ),
+        }}
+      >
+        <Stack.Screen name="index" options={{ headerTitle: "BoxingGroupchat" }} />
+      </Stack>
+    </NavThemeProvider>
+  );
+}
+
+const RootLayout = () => {
   const [loaded] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
   });
-
-  if (!loaded) {
-    // Async font loading only occurs in development.
-    return null;
-  }
-
+  // Optionally handle font loading state if needed
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="+not-found" />
-      </Stack>
-      <StatusBar style="auto" />
+    <ThemeProvider>
+      <RootStackInner />
     </ThemeProvider>
   );
-}
+};
+
+export default RootLayout;
