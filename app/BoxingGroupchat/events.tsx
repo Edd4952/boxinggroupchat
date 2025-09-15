@@ -1,5 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
-import React, { useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useFocusEffect } from '@react-navigation/native';
+import React, { useEffect, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { colorsFor, useThemeMode } from '../theme';
 
@@ -18,29 +20,85 @@ export default function Chat() {
         : (mode && (mode as any).mode) ? (mode as any).mode : 'light';
     const c = colorsFor(modeStr);
 
-    const [events, setEvents] = useState<Event[]>([
-        { title: 'Sample Event', date: new Date().toLocaleDateString(), location: 'Gym', description: 'A sample event.' }
-    ]);
+    // start empty; we'll load persisted events asynchronously
+    const [events, setEvents] = useState<Event[]>([]);
     const [modalVisible, setModalVisible] = useState(false);
     const [title, setTitle] = useState('');
     const [date, setDate] = useState('');
     const [location, setLocation] = useState('');
     const [description, setDescription] = useState('');
 
+    const EVENTS_KEY = '@boxinggroupchat_events_v1';
+
+    async function saveEventsToDevice(list: Event[]) {
+        try {
+            await AsyncStorage.setItem(EVENTS_KEY, JSON.stringify(list));
+        } catch (e) {
+            console.warn('Failed to save events to AsyncStorage:', e);
+        }
+    }
+
+    async function loadEvents() {
+        try {
+            const raw = await AsyncStorage.getItem(EVENTS_KEY);
+            if (!raw) {
+                // no saved events
+                setEvents([]);
+                return;
+            }
+            const parsed = JSON.parse(raw) as Event[];
+            if (Array.isArray(parsed)) {
+                setEvents(parsed);
+            }
+        } catch (e) {
+            console.warn('Failed to load events from AsyncStorage:', e);
+        }
+    }
+
     const resetForm = () => { setTitle(''); setDate(''); setLocation(''); setDescription(''); };
-    const saveEvent = () => {
+
+    const saveEvent = async () => {
         const e: Event = { title: title || 'Untitled', date: date || new Date().toLocaleDateString(), location: location || 'Unknown', description };
-        setEvents(prev => [e, ...prev]);
+        const next = [e, ...events];
+        setEvents(next);
+        await saveEventsToDevice(next);
         setModalVisible(false);
         resetForm();
     };
+
+    // load on mount and whenever the screen gains focus
+    useEffect(() => {
+        loadEvents();
+    }, []);
+
+    useFocusEffect(
+        React.useCallback(() => {
+            const loadOnFocus = async () => {
+                try {
+                    const raw = await AsyncStorage.getItem(EVENTS_KEY);
+                    if (raw) {
+                        const parsed = JSON.parse(raw);
+                        console.log(parsed);
+                        setEvents(parsed);
+                    } else {
+                        setEvents([]);
+                    }
+                } catch (e) {
+                    console.warn('Failed to load events on focus:', e);
+                }
+            };
+            loadOnFocus();
+        }, [])
+    );
 
     return (
         <View style={{ flex: 1, backgroundColor: c.bg }}>
             <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.container}>
                 <Text style={styles.title}>Events</Text>
+                
+                {/* Event Box */}
 
-                {events.map((ev, i) => (
+                {events.map((ev, i) => (    
                     <View key={i} style={styles.eventbox}>
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                             <Text style={styles.text1}>{ev.title}</Text>
@@ -57,7 +115,12 @@ export default function Chat() {
                         <View style={styles.separator} />
                         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                             <Text style={styles.text2}>{ev.description}</Text>
-                            <Pressable onPress={() => setEvents(prev => prev.filter((_, index) => index !== i))} accessibilityRole="button" style={{ marginLeft: 8 }}>
+                            {/*delete button*/}
+                            <Pressable onPress={async () => {
+                                const next = events.filter((_, index) => index !== i);
+                                setEvents(next);
+                                await saveEventsToDevice(next);
+                            }} accessibilityRole="button" style={{ marginLeft: 8 }}>
                                 <Ionicons name="trash-outline" size={18} color={'red'} />
                             </Pressable>
                         </View>
@@ -82,14 +145,14 @@ export default function Chat() {
                 </TouchableOpacity>
             </View>
 
-            <Modal visible={modalVisible} animationType="slide" transparent>
+            <Modal visible={modalVisible} animationType="fade" transparent>
                 <View style={styles.modalOverlay}>
                     <View style={[styles.modalContent, { backgroundColor: c.card }]}> 
                         <Text style={[styles.text1, { marginBottom: 8 }]}>New Event</Text>
-                        <TextInput placeholder="Title" placeholderTextColor={modeStr === 'dark' ? '#ccc' : '#666'} value={title} onChangeText={setTitle} style={[styles.input, { color: c.text }]} />
-                        <TextInput placeholder="Date" placeholderTextColor={modeStr === 'dark' ? '#ccc' : '#666'} value={date} onChangeText={setDate} style={[styles.input, { color: c.text }]} />
-                        <TextInput placeholder="Location" placeholderTextColor={modeStr === 'dark' ? '#ccc' : '#666'} value={location} onChangeText={setLocation} style={[styles.input, { color: c.text }]} />
-                        <TextInput placeholder="Description" placeholderTextColor={modeStr === 'dark' ? '#ccc' : '#666'} value={description} onChangeText={setDescription} style={[styles.input, { color: c.text, height: 80 }]} multiline />
+                        <TextInput placeholder="What's the move?" placeholderTextColor={modeStr === 'dark' ? '#ccc' : '#666'} value={title} onChangeText={setTitle} style={[styles.input, { color: c.text }]} />
+                        <TextInput placeholder="When?" placeholderTextColor={modeStr === 'dark' ? '#ccc' : '#666'} value={date} onChangeText={setDate} style={[styles.input, { color: c.text }]} />
+                        <TextInput placeholder="Drop the addy" placeholderTextColor={modeStr === 'dark' ? '#ccc' : '#666'} value={location} onChangeText={setLocation} style={[styles.input, { color: c.text }]} />
+                        <TextInput placeholder="What's the word?" placeholderTextColor={modeStr === 'dark' ? '#ccc' : '#666'} value={description} onChangeText={setDescription} style={[styles.input, { color: c.text, height: 80 }]} multiline />
 
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 12, width: '100%' }}>
                             <Pressable onPress={() => { setModalVisible(false); resetForm(); }} style={[styles.modalButton, { backgroundColor: 'transparent', borderColor: modeStr === 'dark' ? '#444' : '#ccc' }]}>
@@ -139,7 +202,7 @@ const themedStyles = (mode: any) => {
             color: c.text,
             fontSize: 14,
             marginVertical: 8,
-            lineHeight: 12,
+            lineHeight: 16,
         },
         separator: {
             height: 1,
