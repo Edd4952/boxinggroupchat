@@ -13,6 +13,7 @@ type Event = {
 };
 
 export default function Chat() {
+    {/*for colors*/}
     const mode = useThemeMode();
     const styles = themedStyles(mode);
     const modeStr: 'light' | 'dark' = typeof mode === 'string'
