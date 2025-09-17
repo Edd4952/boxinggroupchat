@@ -113,6 +113,24 @@ export default function Chat() {
         }, 50);
     };
 
+    const quotes: string[] = ["The ultimate aim of martial arts is not having to use them. - Miyamoto Musashi",
+                            "Do not fight with the strength, absorb it, and it flows, use it. - Yip Man",
+                            "Float like a butterfly, sting like a bee. - Muhammad Ali",
+                            "It’s not about how hard you hit; it’s about how hard you can get hit and keep moving forward. – Tyler Woods",
+                            "Empty your mind, be formless. Shapeless, like water. ― Bruce Lee ",
+                            "Feedback is the breakfast of champions. – Ken Blanchard",
+                            ];
+
+    const [selectedQuote, setSelectedQuote] = useState<string>(() => quotes[Math.floor(Math.random() * quotes.length)]);
+
+    // When messages becomes empty (initial load or after reset), pick a new quote.
+    useEffect(() => {
+        if (messages.length === 0) {
+            setSelectedQuote(quotes[Math.floor(Math.random() * quotes.length)]);
+        }
+    }, [messages.length]);
+
+
     return (
         <View style={styles.container}>
             {/*reset button*/}
@@ -135,18 +153,22 @@ export default function Chat() {
                     try { scrollRef.current?.scrollToEnd({ animated: true }); } catch (e) { /* ignore */ }
                 }}
             >
-                {messages.map(m => (
-                    <View key={m.id} style={{ marginBottom: 8 }}>
-                        <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-                            <Text style={{ color: m.color, fontWeight: 'bold' }}>{m.user}</Text>
-                            <Text style={{ color: c.text, fontSize: 10 }}>{new Date(m.timestamp).toLocaleString()}</Text>
-                        </View>
-                        <Text style={{ color: c.text }}>{m.content}</Text>
-                        
-                        <View style={[styles.separator, { marginTop: 8 }]} />
+                {messages.length === 0 ? (
+                    <View style={{ height: 200, alignItems: 'center', justifyContent: 'center' }}>
+                        <Text style={{ color: c.text, opacity: 0.8 }}>{selectedQuote}</Text>
                     </View>
-                    
-                ))}
+                ) : (
+                    messages.map(m => (
+                        <View key={m.id} style={{ marginBottom: 8 }}>
+                            <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                                <Text style={{ color: m.color, fontWeight: 'bold' }}>{m.user}</Text>
+                                <Text style={{ color: c.text, fontSize: 10 }}>{new Date(m.timestamp).toLocaleString()}</Text>
+                            </View>
+                            <Text style={{ color: c.text }}>{m.content}</Text>
+                            <View style={[styles.separator, { marginTop: 8 }]} />
+                        </View>
+                    ))
+                )}
             </ScrollView>
             <View style={{ display: 'flex', justifyContent: 'space-between', flexDirection: 'row', width: '100%', paddingHorizontal: 16, marginVertical: 8 }}>
                 <TextInput

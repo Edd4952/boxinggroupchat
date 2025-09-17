@@ -70,7 +70,7 @@ const HomePage = () => {
           }}
         />
         <Text style={{ color: c.text, marginBottom: 6 }}>Choose color</Text>
-        <View style={{ flexDirection: 'row', gap: 8, marginBottom: 8 }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
             {['#4f46e5', '#ef4444', '#f59e0b', '#10b981', '#06b6d4', '#a78bfa'].map(col => (
               <TouchableOpacity key={col} onPress={() => { setProfileColor(col); saveProfile(undefined, col); }} accessibilityRole="button">
                 <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: col, borderWidth: profileColor === col ? 3 : 1, borderColor: profileColor === col ? (modeStr === 'dark' ? '#fff' : '#000') : '#ccc' }} />

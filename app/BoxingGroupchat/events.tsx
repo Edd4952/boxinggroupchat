@@ -99,7 +99,12 @@ export default function Chat() {
                 
                 {/* Event Box */}
 
-                {events.map((ev, i) => (    
+                {events.length === 0 ? (
+                    <View style={{ height: 200, alignItems: 'center', justifyContent: 'center' }}>
+                        <Text style={{ color: c.text, opacity: 0.8 }}>No events yet — tap "+ Add Event" to add one.</Text>
+                    </View>
+                ) : (
+                    events.map((ev, i) => (
                     <View key={i} style={styles.eventbox}>
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                             <Text style={styles.text1}>{ev.title}</Text>
@@ -126,7 +131,8 @@ export default function Chat() {
                             </Pressable>
                         </View>
                     </View>
-                ))}
+                    ))
+                )}
 
             </ScrollView>
 
