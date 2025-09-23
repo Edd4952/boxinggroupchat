@@ -1,3 +1,6 @@
+import 'react-native-get-random-values';
+import { v4 as uuidv4 } from 'uuid';
+
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
@@ -5,6 +8,9 @@ import React, { useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { ScrollView } from 'react-native-gesture-handler';
 import { colorsFor, useThemeMode } from '../theme';
+
+import { supabase } from '../supabase';
+
 
 
 type message = {
@@ -40,6 +46,26 @@ export default function Chat() {
     }
 
     async function loadMessages() {
+        // Try loading from Supabase first, then fall back to device cache
+        try {
+            const { data, error } = await supabase
+                .from('messages')
+                .select('id, user, content, timestamp, color')
+                .order('timestamp', { ascending: true })
+                .limit(500)
+            if (error) throw error;
+            if (data && Array.isArray(data)) {
+                const mapped = data.map((r: any) => ({ id: String(r.id), user: r.user || 'Unknown', content: r.content || '', timestamp: r.timestamp || new Date().toISOString(), color: r.color || '#ffffff' })) as message[];
+                setMessages(mapped);
+                await saveMessages(mapped);
+                console.log('messages loaded from database:', mapped);
+                return;
+            }
+        } catch (e) {
+            console.warn('Supabase load failed, falling back to device cache:', e);
+        }
+
+        // Fallback to device cache
         try {
             const raw = await AsyncStorage.getItem(MESSAGES_KEY);
             if (!raw) {
@@ -49,7 +75,7 @@ export default function Chat() {
             const parsed = JSON.parse(raw) as message[];
             if (Array.isArray(parsed)) setMessages(parsed);
         } catch (e) {
-            console.warn('Failed to load messages:', e);
+            console.warn('Failed to load messages from device cache:', e);
             setMessages([]);
         }
     }
@@ -102,7 +128,9 @@ export default function Chat() {
 
     const sendMessage = async () => {
         if (!text.trim()) return;
-    const msg: message = { id: Date.now().toString(), user: profileName || 'You', content: text.trim(), timestamp: new Date().toISOString(), color: profileColor };
+        // optimistic UI: create a temporary message and persist locally, then insert to Supabase
+        const tempId = Date.now().toString();
+        const msg: message = { id: tempId, user: profileName || 'You', content: text.trim(), timestamp: new Date().toISOString(), color: profileColor };
         const next = [...messages, msg]; // append so oldest is first, newest last
         setMessages(next);
         setText('');
@@ -111,14 +139,78 @@ export default function Chat() {
         setTimeout(() => {
             try { scrollRef.current?.scrollToEnd({ animated: true }); } catch (e) { /* ignore */ }
         }, 50);
+
+        // insert into Supabase and reconcile optimistic message
+        try {
+            const id = uuidv4();
+            const { data, error } = await supabase
+                .from('messages')
+                .insert([{ id, user: msg.user, content: msg.content, timestamp: msg.timestamp, color: msg.color }])
+                .select()
+            if (error) {
+                console.warn('Failed to save message to Supabase:', error);
+                return;
+            }
+            if (data && data[0]) {
+                const inserted = data[0] as any;
+                // replace the optimistic message id/timestamp with the authoritative one
+                setMessages(curr => {
+                    const replaced = curr.map(m => m.id === tempId ? { ...m, id: String(inserted.id), timestamp: inserted.timestamp || m.timestamp } : m);
+                    saveMessages(replaced).catch(() => {});
+                    return replaced;
+                });
+            }
+        } catch (e) {
+            console.warn('Supabase insert error:', e);
+        }
     };
+
+    // subscribe to realtime inserts so other clients show messages live
+    useEffect(() => {
+        let channel: any;
+        const start = async () => {
+            try {
+                channel = supabase
+                    .channel('public:messages')
+                    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload: any) => {
+                        const r = payload.new as any;
+                        const incoming: message = { id: String(r.id), user: r.user || 'Unknown', content: r.content || '', timestamp: r.timestamp || new Date().toISOString(), color: r.color || '#ffffff' };
+                        setMessages(curr => {
+                            // Deduplicate: skip if we already have this id or an identical recent optimistic message
+                            const exists = curr.some(m => m.id === incoming.id || (m.user === incoming.user && m.content === incoming.content && Math.abs(new Date(m.timestamp).getTime() - new Date(incoming.timestamp).getTime()) < 5000));
+                            if (exists) return curr;
+                            const next = [...curr, incoming];
+                            saveMessages(next).catch(() => {});
+                            return next;
+                        });
+                        try { scrollRef.current?.scrollToEnd({ animated: true }); } catch (e) { }
+                    })
+                    .subscribe();
+            } catch (e) {
+                console.warn('Realtime subscription failed:', e);
+            }
+        };
+        start();
+        return () => {
+            try {
+                if (channel) {
+                    // unsubscribe from the realtime channel
+                    channel.unsubscribe?.();
+                    // also remove with Supabase client if available
+                    if (typeof supabase.removeChannel === 'function') {
+                        try { supabase.removeChannel(channel); } catch (e) { /* ignore */ }
+                    }
+                }
+            } catch (e) { }
+        };
+    }, []);
 
     const quotes: string[] = ["The ultimate aim of martial arts is not having to use them. - Miyamoto Musashi",
                             "Do not fight with the strength, absorb it, and it flows, use it. - Yip Man",
                             "Float like a butterfly, sting like a bee. - Muhammad Ali",
-                            "It’s not about how hard you hit; it’s about how hard you can get hit and keep moving forward. – Tyler Woods",
+                            "It's not about how hard you hit; it's about how hard you can get hit and keep moving forward. - Tyler Woods",
                             "Empty your mind, be formless. Shapeless, like water. ― Bruce Lee ",
-                            "Feedback is the breakfast of champions. – Ken Blanchard",
+                            "Feedback is the breakfast of champions. - Ken Blanchard",
                             ];
 
     const [selectedQuote, setSelectedQuote] = useState<string>(() => quotes[Math.floor(Math.random() * quotes.length)]);

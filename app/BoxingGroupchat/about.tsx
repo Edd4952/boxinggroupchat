@@ -10,7 +10,7 @@ const About = () => {
     return (
         <View style={styles.container}>
             <View style={styles.topic}>
-                <Text style={styles.title}>About Page</Text>
+                <Text style={[styles.title, {marginTop: 4}]}>About Page</Text>
                 <Text style={styles.text2}>
                     Welcome to fight club.{'\n'}
                     The first rule of fight club is you do not talk about fight club.{'\n'}
@@ -24,13 +24,11 @@ const About = () => {
                 </Text>
             </View>
             <View style={styles.topic}>
-                <Text style={styles.title}>Found a bug?</Text>
-                <Text style={[styles.title, {marginTop: 0}]}>Recommendations?</Text>
-                <Text style={[styles.title, {marginTop: 0}]}>Questions?</Text>
+                <Text style={[styles.title, {marginTop: 4}]}>Rules</Text>
                 <Text style={styles.text2}>
-                    Reach out to our skilled team of professionals!{'\n\n'}
-                    Email: zilbert3dward@gmail.com
-                    {'\n'}1-(847) 533-7331
+                    1. Respect
+                    {'\n'}2. Don't spam
+                    {'\n'}3. Everyone has the same access to the chat and events maker. Don't abuse it.
                 </Text>
             </View>
         </View>
@@ -54,7 +52,6 @@ const themedStyles = (mode: 'light' | 'dark') => {
         title: {
             color: c.text,
             fontSize: 28,
-            marginTop: 8,
             marginLeft: 8,
             fontWeight: 'bold',
         },
