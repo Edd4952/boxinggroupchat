@@ -16,3 +16,4 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 //     $env:SUPABASE_KEY = "your-anon-key"; npx expo start
 // - Or create app.config.js to forward process.env to expo.extra.SUPABASE_ANON_KEY.
 // - Do NOT store service_role keys here. Only expose the anon/public key to clients.
+export default supabase;

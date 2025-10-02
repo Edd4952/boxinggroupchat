@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { colorsFor, useThemeMode } from './theme';
 
+export const devVer: boolean = false;
 
 const HomePage = () => {
   const mode = useThemeMode();
@@ -40,16 +41,8 @@ const HomePage = () => {
   useEffect(() => { loadProfile(); }, []);
   return (
     <View style={[styles.container, { backgroundColor: c.bg }]}>
-      <Text style={[styles.text, { color: c.text }]}>Welcome to my app</Text>
-      <Link style={[styles.button]} href={{ pathname: "/BoxingGroupchat/chat", params: { id: "1" } }}>
-          <Text style={[styles.text, { color: c.text }]}>Open chat</Text>
-      </Link>
-      <Pressable style={[styles.button2]} onPress={() => router.push({ pathname: "/BoxingGroupchat/events" })}>
-        <Text style={[styles.text, { color: c.text }]}>View events</Text>
-      </Pressable>
-      <Pressable style={[styles.button2]} onPress={() => router.push({ pathname: "/BoxingGroupchat/about" })}>
-        <Text style={[styles.text, { color: c.text }]}>About Page</Text>
-      </Pressable>
+      <Text style={[styles.text, { color: c.text }]}>Welcome to</Text>
+      <Text style={[styles.text, { fontSize: 36, fontWeight: 'bold', color: c.text, marginBottom: 16 }]}>Boxing Group Chat</Text>
       <View style={{ width: '100%', paddingHorizontal: 16, marginBottom: 12 }}>
         <Text style={{ color: c.text, marginBottom: 6 }}>Display name</Text>
         <TextInput
@@ -69,8 +62,8 @@ const HomePage = () => {
             marginBottom: 8,
           }}
         />
-        <Text style={{ color: c.text, marginBottom: 6 }}>Choose color</Text>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+        <Text style={{ color: c.text, marginBottom: 12 }}>Choose color</Text>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 0}}>
             {['#4f46e5', '#ef4444', '#f59e0b', '#10b981', '#06b6d4', '#a78bfa'].map(col => (
               <TouchableOpacity key={col} onPress={() => { setProfileColor(col); saveProfile(undefined, col); }} accessibilityRole="button">
                 <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: col, borderWidth: profileColor === col ? 3 : 1, borderColor: profileColor === col ? (modeStr === 'dark' ? '#fff' : '#000') : '#ccc' }} />
@@ -78,6 +71,16 @@ const HomePage = () => {
             ))}
         </View>
       </View>
+      <Link style={[styles.button]} href={{ pathname: "/BoxingGroupchat/chat", params: { id: "1" } }}>
+          <Text style={[styles.text, { color: c.text }]}>Open chat</Text>
+      </Link>
+      <Pressable style={[styles.button2]} onPress={() => router.push({ pathname: "/BoxingGroupchat/events" })}>
+        <Text style={[styles.text, { color: c.text }]}>View events</Text>
+      </Pressable>
+      <Pressable style={[styles.button2]} onPress={() => router.push({ pathname: "/BoxingGroupchat/about" })}>
+        <Text style={[styles.text, { color: c.text }]}>About Page</Text>
+      </Pressable>
+      
     </View>
   );
 }

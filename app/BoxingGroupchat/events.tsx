@@ -1,9 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+// AsyncStorage fallback removed — DB is now the source of truth
 import { useFocusEffect } from '@react-navigation/native';
 import React, { useEffect, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { devVer } from '../index';
 import { colorsFor, useThemeMode } from '../theme';
+
+import { supabase } from '../supabase';
 
 type Event = {
     title: string;
@@ -28,67 +31,83 @@ export default function Chat() {
     const [date, setDate] = useState('');
     const [location, setLocation] = useState('');
     const [description, setDescription] = useState('');
-
-    const EVENTS_KEY = '@boxinggroupchat_events_v1';
-
-    async function saveEventsToDevice(list: Event[]) {
-        try {
-            await AsyncStorage.setItem(EVENTS_KEY, JSON.stringify(list));
-        } catch (e) {
-            console.warn('Failed to save events to AsyncStorage:', e);
-        }
-    }
+    const [dbError, setDbError] = useState<string | null>(null);
+    // no device cache key — we don't fall back to AsyncStorage anymore
 
     async function loadEvents() {
         try {
-            const raw = await AsyncStorage.getItem(EVENTS_KEY);
-            if (!raw) {
-                // no saved events
-                setEvents([]);
+            const { data, error } = await supabase
+                .from('events')
+                .select('title, date, location, description')
+                .order('date', { ascending: true })
+                .limit(500);
+            if (error) throw error;
+            if (data && Array.isArray(data)) {
+                const mapped = data.map((r: any) => ({
+                    title: r.title || 'Untitled',
+                    date: r.date || new Date().toLocaleDateString(),
+                    location: r.location || 'Unknown',
+                    description: r.description || ''
+                }));
+                setEvents(mapped);
+                setDbError(null);
+                console.log('events loaded from database:', mapped);
                 return;
             }
-            const parsed = JSON.parse(raw) as Event[];
-            if (Array.isArray(parsed)) {
-                setEvents(parsed);
-            }
-        } catch (e) {
-            console.warn('Failed to load events from AsyncStorage:', e);
+            // no rows => empty list, clear any db error
+            setEvents([]);
+            setDbError(null);
+        } catch (e: any) {
+            console.warn('Supabase load failed:', e);
+            setEvents([]); // clear UI when DB isn't reachable
+            setDbError('Could not reach database. Please check your network or try again.');
         }
     }
 
     const resetForm = () => { setTitle(''); setDate(''); setLocation(''); setDescription(''); };
 
-    const saveEvent = async () => {
-        const e: Event = { title: title || 'Untitled', date: date || new Date().toLocaleDateString(), location: location || 'Unknown', description };
-        const next = [e, ...events];
-        setEvents(next);
-        await saveEventsToDevice(next);
-        setModalVisible(false);
-        resetForm();
-    };
+    // Save a single event to Supabase and update local state
+    async function saveEvent() {
+        const e: Omit<Event, 'id'> = {
+            title: title || 'Untitled',
+            date: date || new Date().toLocaleDateString(),
+            location: location || 'Unknown',
+            description
+        };
+        try {
+            const { data, error } = await supabase
+                .from('events')
+                .insert([e])
+                .select()
+                .single();
+            if (error) throw error;
+            const created: Event = {
+                title: (data as any).title,
+                date: (data as any).date,
+                location: (data as any).location,
+                description: (data as any).description
+            };
+            // prepend newest at top to keep existing UI order
+            setEvents(curr => [created, ...curr]);
+            setDbError(null);
+        } catch (err: any) {
+            console.warn('Failed to save event to database:', err);
+            setDbError('Failed to save event to database.');
+        } finally {
+            setModalVisible(false);
+            resetForm();
+        }
+    }
 
-    // load on mount and whenever the screen gains focus
+    // load on mount and whenever the screen gains focus (DB-only)
     useEffect(() => {
         loadEvents();
     }, []);
 
     useFocusEffect(
         React.useCallback(() => {
-            const loadOnFocus = async () => {
-                try {
-                    const raw = await AsyncStorage.getItem(EVENTS_KEY);
-                    if (raw) {
-                        const parsed = JSON.parse(raw);
-                        console.log(parsed);
-                        setEvents(parsed);
-                    } else {
-                        setEvents([]);
-                    }
-                } catch (e) {
-                    console.warn('Failed to load events on focus:', e);
-                }
-            };
-            loadOnFocus();
+            // Re-fetch events from Supabase whenever the screen gains focus.
+            loadEvents();
         }, [])
     );
 
@@ -121,14 +140,25 @@ export default function Chat() {
                         <View style={styles.separator} />
                         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                             <Text style={styles.text2}>{ev.description}</Text>
-                            {/*delete button*/}
-                            <Pressable onPress={async () => {
-                                const next = events.filter((_, index) => index !== i);
-                                setEvents(next);
-                                await saveEventsToDevice(next);
-                            }} accessibilityRole="button" style={{ marginLeft: 8 }}>
-                                <Ionicons name="trash-outline" size={18} color={'red'} />
-                            </Pressable>
+                            {devVer ? (
+                                <Pressable onPress={async () => {
+                                    const ev = events[i];
+                                    try {
+                                        if (ev.title) {
+                                            const { error } = await supabase.from('events').delete().eq('title', ev.title);
+                                            if (error) throw error;
+                                        }
+                                        const next = events.filter((_, index) => index !== i);
+                                        setEvents(next);
+                                        setDbError(null);
+                                    } catch (err: any) {
+                                        console.warn('Failed to delete event from DB:', err);
+                                        setDbError('Failed to delete event from database.');
+                                    }
+                                }} accessibilityRole="button" style={{ marginLeft: 8 }}>
+                                    <Ionicons name="trash-outline" size={18} color={'red'} />
+                                </Pressable>
+                            ) : null}
                         </View>
                     </View>
                     ))

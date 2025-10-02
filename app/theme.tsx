@@ -23,7 +23,7 @@ export const colorsFor = (mode: ThemeMode) =>
         bg: '#222',
         card: '#333',
         card2: '#444',      // lighter than card
-        card3: '#2a2a2a',   // darker than card
+        card3: '#4d4d4dff',   // darker than card
         text: '#fff',
         tint: '#fff',
         headerBg: '#111',
@@ -37,3 +37,10 @@ export const colorsFor = (mode: ThemeMode) =>
         tint: '#000',
         headerBg: '#c7c7c7ff',
       };
+
+
+export default {
+  colorsFor,
+  useThemeMode,
+  ThemeProvider,
+};

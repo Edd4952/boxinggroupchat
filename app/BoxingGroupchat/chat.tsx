@@ -7,10 +7,9 @@ import { useFocusEffect } from '@react-navigation/native';
 import React, { useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { ScrollView } from 'react-native-gesture-handler';
-import { colorsFor, useThemeMode } from '../theme';
-
+import { devVer } from '../index';
 import { supabase } from '../supabase';
-
+import { colorsFor, useThemeMode } from '../theme';
 
 
 type message = {
@@ -20,6 +19,7 @@ type message = {
     timestamp: string;
     color?: string;
 };
+
 
 export default function Chat() {
     const mode = useThemeMode();
@@ -35,6 +35,7 @@ export default function Chat() {
     const [text, setText] = useState('');
     const [profileName, setProfileName] = useState('You');
     const [profileColor, setProfileColor] = useState('#ffffff');
+    const [dbError, setDbError] = useState<string | null>(null);
     const scrollRef = useRef<ScrollView | null>(null);
 
     async function saveMessages(list: message[]) {
@@ -46,37 +47,34 @@ export default function Chat() {
     }
 
     async function loadMessages() {
-        // Try loading from Supabase first, then fall back to device cache
+        // Try loading from Supabase. If it fails, show an error to the user.
         try {
             const { data, error } = await supabase
                 .from('messages')
                 .select('id, user, content, timestamp, color')
                 .order('timestamp', { ascending: true })
-                .limit(500)
+                .limit(500);
             if (error) throw error;
             if (data && Array.isArray(data)) {
-                const mapped = data.map((r: any) => ({ id: String(r.id), user: r.user || 'Unknown', content: r.content || '', timestamp: r.timestamp || new Date().toISOString(), color: r.color || '#ffffff' })) as message[];
+                const mapped = data.map((r: any) => ({
+                    id: String(r.id),
+                    user: r.user || 'Unknown',
+                    content: r.content || '',
+                    timestamp: r.timestamp || new Date().toISOString(),
+                    color: r.color || '#ffffff'
+                })) as message[];
                 setMessages(mapped);
-                await saveMessages(mapped);
+                setDbError(null);
                 console.log('messages loaded from database:', mapped);
                 return;
             }
-        } catch (e) {
-            console.warn('Supabase load failed, falling back to device cache:', e);
-        }
-
-        // Fallback to device cache
-        try {
-            const raw = await AsyncStorage.getItem(MESSAGES_KEY);
-            if (!raw) {
-                setMessages([]);
-                return;
-            }
-            const parsed = JSON.parse(raw) as message[];
-            if (Array.isArray(parsed)) setMessages(parsed);
-        } catch (e) {
-            console.warn('Failed to load messages from device cache:', e);
+            // no rows => empty list, clear any db error
             setMessages([]);
+            setDbError(null);
+        } catch (e: any) {
+            console.warn('Supabase load failed:', e);
+            setMessages([]); // clear UI when DB isn't reachable
+            setDbError('Could not reach database. Please check your network or try again.');
         }
     }
 
@@ -149,6 +147,10 @@ export default function Chat() {
                 .select()
             if (error) {
                 console.warn('Failed to save message to Supabase:', error);
+                setDbError('Failed to save message to the database.');
+                // revert optimistic message
+                setMessages(curr => curr.filter(m => m.id !== tempId));
+                await saveMessages(messages.filter(m => m.id !== tempId));
                 return;
             }
             if (data && data[0]) {
@@ -164,6 +166,26 @@ export default function Chat() {
             console.warn('Supabase insert error:', e);
         }
     };
+
+    // Clears all rows from the Supabase `messages` table and local cache.
+    async function clearMessagesInDb() {
+        try {
+            setDbError(null);
+            // Delete all rows — use neq('id','') which matches any non-empty id value.
+            const { error } = await supabase.from('messages').delete().neq('id', '');
+            if (error) {
+                console.warn('Failed to clear messages in DB:', error);
+                setDbError('Failed to clear messages in database.');
+                return;
+            }
+            // Clear local state and storage after successful DB delete
+            setMessages([]);
+            await saveMessages([]);
+        } catch (e: any) {
+            console.warn('Error clearing messages:', e);
+            setDbError('Error clearing messages.');
+        }
+    }
 
     // subscribe to realtime inserts so other clients show messages live
     useEffect(() => {
@@ -186,8 +208,9 @@ export default function Chat() {
                         try { scrollRef.current?.scrollToEnd({ animated: true }); } catch (e) { }
                     })
                     .subscribe();
-            } catch (e) {
+            } catch (e: any) {
                 console.warn('Realtime subscription failed:', e);
+                setDbError('Realtime subscription failed (cannot reach database).');
             }
         };
         start();
@@ -203,7 +226,7 @@ export default function Chat() {
                 }
             } catch (e) { }
         };
-    }, []);
+     }, []);
 
     const quotes: string[] = ["The ultimate aim of martial arts is not having to use them. - Miyamoto Musashi",
                             "Do not fight with the strength, absorb it, and it flows, use it. - Yip Man",
@@ -225,19 +248,42 @@ export default function Chat() {
 
     return (
         <View style={styles.container}>
-            {/*reset button*/}
-            <TouchableOpacity style={{ width: '90%' }} onPress={() => { setMessages([]); saveMessages([]); }} accessibilityRole="button">
-                <View style={{
-                    backgroundColor: c.card,
-                    paddingVertical: 10,
-                    borderRadius: 8,
-                    borderWidth: 1,
-                    borderColor: modeStr === 'dark' ? '#111' : '#e6e6e6',
-                    alignItems: 'center',
-                }}>
-                    <Text style={{ color: c.text, fontWeight: 'bold', fontSize: 16 }}>Reset Chat</Text>
+            {dbError ? (
+                <View style={{ width: '90%', backgroundColor: '#2b0414', padding: 8, borderRadius: 6, marginBottom: 8 }}>
+                    <Text style={{ color: '#ffdddd', marginBottom: 6 }}>{dbError}</Text>
+                    <TouchableOpacity onPress={() => { setDbError(null); loadMessages(); }} accessibilityRole="button">
+                        <View style={{ paddingVertical: 6, paddingHorizontal: 8, backgroundColor: '#40050a', borderRadius: 4 }}>
+                            <Text style={{ color: '#fff' }}>Retry</Text>
+                        </View>
+                    </TouchableOpacity>
                 </View>
-            </TouchableOpacity>
+            ) : null}
+            {/*reset button*/}
+            {devVer ? (
+                <TouchableOpacity
+                    style={{ width: '90%' }}
+                    onPress={() => {
+                        setMessages([]);
+                        saveMessages([]);
+                        clearMessagesInDb();
+                    }}
+                    accessibilityRole="button"
+                >
+                    <View
+                        style={{
+                            backgroundColor: c.card,
+                            paddingVertical: 10,
+                            borderRadius: 8,
+                            borderWidth: 1,
+                            borderColor: modeStr === 'dark' ? '#111' : '#e6e6e6',
+                            alignItems: 'center',
+                        }}
+                    >
+                        <Text style={{ color: c.text, fontWeight: 'bold', fontSize: 16 }}>Reset Chat</Text>
+                    </View>
+                </TouchableOpacity>
+            ) : null}
+            
             <ScrollView
                 ref={scrollRef}
                 style={{ width: '90%', paddingHorizontal: 16, marginTop: 8, paddingTop: 8, backgroundColor: c.card, flex: 1 }}
@@ -282,7 +328,8 @@ export default function Chat() {
                     blurOnSubmit={false}
                     onSubmitEditing={() => {sendMessage();}}
                     value={text}
-                    onChangeText={setText}
+                    maxLength={100} // character limit
+                    onChangeText={(t) => setText(t.slice(0, 100))}
                 />
                 <TouchableOpacity onPress={() => {sendMessage();}} accessibilityRole="button">
                     <View style={{
