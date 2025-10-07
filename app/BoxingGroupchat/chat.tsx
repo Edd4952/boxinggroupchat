@@ -5,8 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import React, { useEffect, useRef, useState } from 'react';
-import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { ScrollView } from 'react-native-gesture-handler';
+import { Keyboard, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { devVer } from '../index';
 import { supabase } from '../supabase';
 import { colorsFor, useThemeMode } from '../theme';
@@ -37,6 +36,19 @@ export default function Chat() {
     const [profileColor, setProfileColor] = useState('#ffffff');
     const [dbError, setDbError] = useState<string | null>(null);
     const scrollRef = useRef<ScrollView | null>(null);
+    const [kbHeight, setKbHeight] = useState(0);
+
+    // Listen for keyboard to manually offset (helps Android when resize isn't applied yet)
+    useEffect(() => {
+        const showSub = Keyboard.addListener('keyboardDidShow', e => {
+            setKbHeight(e.endCoordinates?.height ?? 0);
+        });
+        const hideSub = Keyboard.addListener('keyboardDidHide', () => setKbHeight(0));
+        return () => {
+            showSub.remove();
+            hideSub.remove();
+        };
+    }, []);
 
     async function saveMessages(list: message[]) {
         try {
@@ -247,7 +259,13 @@ export default function Chat() {
 
 
     return (
+        <KeyboardAvoidingView
+            style={{ flex: 1 }}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}
+        >
         <View style={styles.container}>
+            {/* error + reset (unchanged) */}
             {dbError ? (
                 <View style={{ width: '90%', backgroundColor: '#2b0414', padding: 8, borderRadius: 6, marginBottom: 8 }}>
                     <Text style={{ color: '#ffdddd', marginBottom: 6 }}>{dbError}</Text>
@@ -258,7 +276,6 @@ export default function Chat() {
                     </TouchableOpacity>
                 </View>
             ) : null}
-            {/*reset button*/}
             {devVer ? (
                 <TouchableOpacity
                     style={{ width: '90%' }}
@@ -283,32 +300,59 @@ export default function Chat() {
                     </View>
                 </TouchableOpacity>
             ) : null}
-            
-            <ScrollView
-                ref={scrollRef}
-                style={{ width: '90%', paddingHorizontal: 16, marginTop: 8, paddingTop: 8, backgroundColor: c.card, flex: 1 }}
-                onContentSizeChange={() => {
-                    try { scrollRef.current?.scrollToEnd({ animated: true }); } catch (e) { /* ignore */ }
+
+            <View style={{ flex: 1, width: '90%' }}>
+                <ScrollView
+                    ref={scrollRef}
+                    keyboardShouldPersistTaps="handled"
+                    keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+                    nestedScrollEnabled
+                    contentContainerStyle={{ paddingVertical: 4 }}
+                    style={{
+                        flex: 1,
+                        paddingHorizontal: 16,
+                        backgroundColor: c.card,
+                        borderRadius: 8,
+                    }}
+                    onContentSizeChange={(_, __) => {
+                        // Only auto-scroll when a new message is added (not on blur).
+                        // Simple heuristic: scroll if last message author is current user or list shorter than threshold.
+                        if (messages.length <= 3 || (messages[messages.length - 1]?.user === profileName)) {
+                            try { scrollRef.current?.scrollToEnd({ animated: true }); } catch {}
+                        }
+                    }}
+                >
+                    {messages.length === 0 ? (
+                        <View style={{ height: 200, alignItems: 'center', justifyContent: 'center' }}>
+                            <Text style={{ color: c.text, opacity: 0.8 }}>{selectedQuote}</Text>
+                        </View>
+                    ) : (
+                        messages.map(m => (
+                            <View key={m.id} style={{ }}>
+                                <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 8 }}>
+                                    <Text style={{ color: m.color, fontWeight: 'bold' }}>{m.user}</Text>
+                                    <Text style={{ color: c.text, fontSize: 10 }}>{new Date(m.timestamp).toLocaleString()}</Text>
+                                </View>
+                                <Text style={{ color: c.text }}>{m.content}</Text>
+                                <View style={[styles.separator, { marginTop: 8 }]} />
+                            </View>
+                        ))
+                    )}
+                </ScrollView>
+            </View>
+
+            {/* Fixed input bar */}
+            <View
+                style={{
+                    flexDirection: 'row',
+                    width: '90%',
+                    paddingHorizontal: 0,
+                    paddingTop: 8,
+                    // remove gap for broader RN support; use marginLeft instead
+                    marginBottom: (Platform.OS === 'ios' ? 8 : 8) + (Platform.OS === 'android' ? kbHeight : 0),
+                    alignItems: 'stretch'   // stretch children to same height
                 }}
             >
-                {messages.length === 0 ? (
-                    <View style={{ height: 200, alignItems: 'center', justifyContent: 'center' }}>
-                        <Text style={{ color: c.text, opacity: 0.8 }}>{selectedQuote}</Text>
-                    </View>
-                ) : (
-                    messages.map(m => (
-                        <View key={m.id} style={{ marginBottom: 8 }}>
-                            <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-                                <Text style={{ color: m.color, fontWeight: 'bold' }}>{m.user}</Text>
-                                <Text style={{ color: c.text, fontSize: 10 }}>{new Date(m.timestamp).toLocaleString()}</Text>
-                            </View>
-                            <Text style={{ color: c.text }}>{m.content}</Text>
-                            <View style={[styles.separator, { marginTop: 8 }]} />
-                        </View>
-                    ))
-                )}
-            </ScrollView>
-            <View style={{ display: 'flex', justifyContent: 'space-between', flexDirection: 'row', width: '100%', paddingHorizontal: 16, marginVertical: 8 }}>
                 <TextInput
                     placeholder="Don't be a stranger :)"
                     placeholderTextColor={modeStr === 'dark' ? '#ccc' : '#666'}
@@ -316,39 +360,44 @@ export default function Chat() {
                         backgroundColor: c.card,
                         color: c.text,
                         flex: 1,
-                        paddingHorizontal: 10,
-                        paddingVertical: 10,
+                        paddingHorizontal: 8,
+                        paddingVertical: 8,
                         borderRadius: 8,
                         borderWidth: 1,
                         borderColor: modeStr === 'dark' ? '#111' : '#e6e6e6',
-                        marginRight: 8,
+                        minHeight: 48,          // baseline height
                     }}
                     multiline
                     returnKeyType="send"
                     blurOnSubmit={false}
-                    onSubmitEditing={() => {sendMessage();}}
+                    onSubmitEditing={sendMessage}
                     value={text}
-                    maxLength={100} // character limit
+                    maxLength={100}
                     onChangeText={(t) => setText(t.slice(0, 100))}
                 />
-                <TouchableOpacity onPress={() => {sendMessage();}} accessibilityRole="button">
+                <TouchableOpacity
+                    onPress={sendMessage}
+                    accessibilityRole="button"
+                    style={{ alignSelf: 'stretch', marginLeft: 6 }}
+                >
                     <View style={{
+                        height: '100%',            // fill the stretched height
                         backgroundColor: c.card,
-                        paddingVertical: 16,
-                        paddingHorizontal: 10,
                         borderRadius: 8,
                         borderWidth: 1,
                         borderColor: modeStr === 'dark' ? '#111' : '#e6e6e6',
+                        justifyContent: 'center',
                         alignItems: 'center',
-                        alignSelf: 'stretch'   // <-- ensures it fills the wrapper
+                        paddingHorizontal: 14,
                     }}>
-                        <Ionicons name="send" size={24} color={c.text} />
+                        <Ionicons name="send" size={22} color={c.text} />
                     </View>
                 </TouchableOpacity>
             </View>
         </View>
-    );
-}
+     </KeyboardAvoidingView>
+ );
+ }
 
 const themedStyles = (mode: any) => {
     const modeStr: 'light' | 'dark' = typeof mode === 'string'

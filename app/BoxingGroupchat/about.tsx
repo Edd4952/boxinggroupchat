@@ -2,30 +2,37 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Clipboard from 'expo-clipboard';
-import * as Device from 'expo-device';
 import { Image } from 'expo-image';
 import { useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { ScrollView, TextInput } from 'react-native-gesture-handler';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { devVer } from '..';
 import { supabase } from '../supabase';
 import { colorsFor, useThemeMode } from '../theme';
-import { devVer } from '..';
 const instalogo = require('../../assets/images/instalogo.png');
 
+let Device: any = null;
+if (Platform.OS !== 'web') {
+    // require so bundler won't try to resolve this on web
+    Device = require('expo-device');
+}
+// use Device only when available, otherwise use web fallback
 async function gatherDeviceInfo() {
-    // Use expo-device to collect basic device info with safe fallbacks and any-casts to avoid TS errors
-    try {
-        const d: any = Device as any;
-        const deviceId = d.deviceId ?? d.osInternalBuildId ?? d.fingerprint ?? 'unknown';
-        const deviceName = d.deviceName ?? d.modelName ?? d.modelId ?? d.brand ?? 'unknown';
-        const isTablet = d.isTablet ?? false;
-        const systemVersion = d.osVersion ?? d.systemVersion ?? 'unknown';
-        return { deviceId, deviceName, isTablet, systemVersion };
-    } catch (e) {
-        console.warn('Failed to gather device info:', e);
-        return { deviceId: 'unknown', deviceName: 'unknown', isTablet: false, systemVersion: 'unknown' };
+    if (Device) {
+        const d: any = Device;
+        return {
+            deviceId: d.deviceId ?? 'unknown',
+            deviceName: d.modelName ?? 'unknown',
+            isTablet: d.isTablet ?? false,
+            systemVersion: d.osVersion ?? String(Platform.Version),
+        };
     }
+    return {
+        deviceId: 'web-' + (typeof navigator !== 'undefined' ? navigator.userAgent.slice(0,32) : 'web'),
+        deviceName: 'web',
+        isTablet: false,
+        systemVersion: typeof navigator !== 'undefined' ? navigator.userAgent : String(Platform.Version),
+    };
 }
 
 // generate a 64-bit-safe unique BigInt id and return its decimal string
@@ -222,10 +229,14 @@ const About = () => {
     }, []);
  
     return (
-        <ScrollView
-            style={styles.container}
-            contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: 6 }}
-        >
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 80}>
+            <ScrollView
+                style={styles.container}
+                contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: 6 }}
+                keyboardShouldPersistTaps="handled"
+                keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+                nestedScrollEnabled={true}
+            >
             <View style={styles.topic}>
                 <Text style={[styles.title, {marginTop: 4}]}>About us</Text>
                 <Text style={styles.text2}>
@@ -343,7 +354,7 @@ const About = () => {
                                      setToastMessage('Message sent');
                                     // use the DB-returned id (string) so local storage matches DB
                                     const sentId = String((data as any)?.id);
-                                     // update local ids array immediately and persist, then refresh the window using the new list
+                                    // update local ids array immediately and persist, then refresh the window using the new list
                                     const newIds = [sentId, ...messageIDs];
                                      try {
                                          await saveMessageIDs(newIds);
@@ -458,8 +469,9 @@ const About = () => {
                     <Text style={{ color: '#fff', fontWeight: '600' }}>{toastMessage}</Text>
                 </View>
             ) : null}
-        </ScrollView>
-    
+                </ScrollView>
+        </KeyboardAvoidingView>
+
     );
 };
 

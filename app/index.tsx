@@ -1,7 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useFocusEffect } from '@react-navigation/native';
 import { Link, router } from 'expo-router';
-import React, { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { Animated, Pressable, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { colorsFor, useThemeMode } from './theme';
 
 export const devVer: boolean = false;
@@ -12,6 +13,26 @@ const HomePage = () => {
     ? (mode as 'light' | 'dark')
     : (mode && (mode as any).mode) ? (mode as any).mode : 'light';
   const c = colorsFor(modeStr);
+  const fade1 = useRef(new Animated.Value(0)).current;
+  const fade2 = useRef(new Animated.Value(0)).current;
+
+  useFocusEffect(
+    React.useCallback(() => {
+      // reset
+      fade1.setValue(0);
+      fade2.setValue(0);
+      // sequence: fade in first, then second, then the rest of the UI
+      Animated.timing(fade1, { toValue: 1, duration: 800, useNativeDriver: true }).start(() => {
+        Animated.timing(fade2, { toValue: 1, duration: 800, useNativeDriver: true }).start(() => {
+
+        });
+      });
+      return () => {
+        fade1.setValue(0);
+        fade2.setValue(0);
+      };
+    }, [fade1, fade2])
+  );
   const PROFILE_KEY = '@boxinggroupchat_profile_v1';
   const [profileName, setProfileName] = useState('You');
   const [profileColor, setProfileColor] = useState('#ffffff');
@@ -41,10 +62,10 @@ const HomePage = () => {
   useEffect(() => { loadProfile(); }, []);
   return (
     <View style={[styles.container, { backgroundColor: c.bg }]}>
-      <Text style={[styles.text, { color: c.text }]}>Welcome to</Text>
-      <Text style={[styles.text, { fontSize: 36, fontWeight: 'bold', color: c.text, marginBottom: 16 }]}>Boxing Group Chat</Text>
+      <Animated.Text style={[styles.text, { color: c.text, opacity: fade1 }]}>Welcome to</Animated.Text>
+      <Animated.Text style={[styles.text, { fontSize: 36, fontWeight: 'bold', color: c.text, marginBottom: 16, opacity: fade2 }]}>Boxing Group Chat</Animated.Text>
       <View style={{ width: '100%', paddingHorizontal: 16, marginBottom: 12 }}>
-        <Text style={{ color: c.text, marginBottom: 6 }}>Display name</Text>
+        <Text style={{ color: c.text, marginBottom: 6 }}>Name</Text>
         <TextInput
           placeholder="Your name"
           placeholderTextColor={modeStr === 'dark' ? '#ccc' : '#666'}
@@ -62,7 +83,7 @@ const HomePage = () => {
             marginBottom: 8,
           }}
         />
-        <Text style={{ color: c.text, marginBottom: 12 }}>Choose color</Text>
+        <Text style={{ color: c.text, marginBottom: 12 }}>Color</Text>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 0}}>
             {['#4f46e5', '#ef4444', '#f59e0b', '#10b981', '#06b6d4', '#a78bfa'].map(col => (
               <TouchableOpacity key={col} onPress={() => { setProfileColor(col); saveProfile(undefined, col); }} accessibilityRole="button">

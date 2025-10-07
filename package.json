@@ -8,7 +8,10 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "lint": "expo lint"
+    "lint": "expo lint",
+  "build:web": "npx expo export --platform web -o web-build",
+  "postbuild": "node -e \"const fs=require('fs');fs.copyFileSync('web-build/index.html','web-build/404.html');\"",
+  "deploy": "npm run build:web && npm run postbuild && npx gh-pages -d web-build"
   },
   "dependencies": {
     "@expo/vector-icons": "^14.1.0",
@@ -22,7 +25,7 @@
     "expo-blur": "~14.1.5",
     "expo-clipboard": "~7.1.5",
     "expo-constants": "~17.1.7",
-    "expo-device": "^8.0.8",
+    "expo-device": "~7.1.4",
     "expo-file-system": "~18.1.11",
     "expo-font": "~13.3.2",
     "expo-haptics": "~14.1.4",
@@ -54,6 +57,7 @@
     "@types/uuid": "^10.0.0",
     "eslint": "^9.25.0",
     "eslint-config-expo": "~9.2.0",
+    "gh-pages": "^6.3.0",
     "typescript": "~5.8.3"
   },
   "private": true
