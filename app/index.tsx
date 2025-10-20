@@ -5,7 +5,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Pressable, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { colorsFor, useThemeMode } from './theme';
 
-export const devVer: boolean = false;
+export const devVer: boolean = true;
 
 const HomePage = () => {
   const mode = useThemeMode();
@@ -34,7 +34,7 @@ const HomePage = () => {
     }, [fade1, fade2])
   );
   const PROFILE_KEY = '@boxinggroupchat_profile_v1';
-  const [profileName, setProfileName] = useState('You');
+  const [profileName, setProfileName] = useState('');
   const [profileColor, setProfileColor] = useState('#ffffff');
 
   async function saveProfile(name?: string, color?: string) {

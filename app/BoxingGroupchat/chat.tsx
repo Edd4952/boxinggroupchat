@@ -260,11 +260,10 @@ export default function Chat() {
 
     return (
         <KeyboardAvoidingView
-            style={{ flex: 1 }}
+            style={ styles.container }
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}
         >
-        <View style={styles.container}>
             {/* error + reset (unchanged) */}
             {dbError ? (
                 <View style={{ width: '90%', backgroundColor: '#2b0414', padding: 8, borderRadius: 6, marginBottom: 8 }}>
@@ -328,7 +327,7 @@ export default function Chat() {
                         </View>
                     ) : (
                         messages.map(m => (
-                            <View key={m.id} style={{ }}>
+                            <View key={m.id}>
                                 <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 8 }}>
                                     <Text style={{ color: m.color, fontWeight: 'bold' }}>{m.user}</Text>
                                     <Text style={{ color: c.text, fontSize: 10 }}>{new Date(m.timestamp).toLocaleString()}</Text>
@@ -338,6 +337,8 @@ export default function Chat() {
                             </View>
                         ))
                     )}
+                    {/* Spacer so last message not hidden when keyboard open (Android) */}
+                    {Platform.OS === 'android' && kbHeight > 0 ? <View style={{ height: kbHeight + 12 }} /> : null}
                 </ScrollView>
             </View>
 
@@ -348,9 +349,9 @@ export default function Chat() {
                     width: '90%',
                     paddingHorizontal: 0,
                     paddingTop: 8,
-                    // remove gap for broader RN support; use marginLeft instead
-                    marginBottom: (Platform.OS === 'ios' ? 8 : 8) + (Platform.OS === 'android' ? kbHeight : 0),
-                    alignItems: 'stretch'   // stretch children to same height
+                    // remove kbHeight here
+                    marginBottom: Platform.OS === 'ios' ? 8 : 8,
+                    alignItems: 'stretch'
                 }}
             >
                 <TextInput
@@ -394,8 +395,7 @@ export default function Chat() {
                     </View>
                 </TouchableOpacity>
             </View>
-        </View>
-     </KeyboardAvoidingView>
+        </KeyboardAvoidingView>
  );
  }
 

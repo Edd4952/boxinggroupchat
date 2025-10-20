@@ -21,7 +21,9 @@
       "softwareKeyboardLayoutMode": "resize"
     },
     "web": {
-      "bundler": "metro"
+      "bundler": "metro",
+      "publicPath": "./",
+      "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
       "expo-router",
