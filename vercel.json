@@ -1,6 +1,10 @@
 {
   "version": 2,
   "rewrites": [
+    { "source": "/api/vapidPublicKey", "destination": "/api/vapidPublicKey.js" },
+    { "source": "/api/subscribe", "destination": "/api/subscribe.js" },
+    { "source": "/api/unsubscribe", "destination": "/api/unsubscribe.js" },
+    { "source": "/api/notify", "destination": "/api/notify.js" },
     { "source": "/(.*)", "destination": "/" }
   ]
 }

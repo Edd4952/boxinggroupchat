@@ -2,10 +2,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { Link, router } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, Pressable, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, Animated, Platform, Pressable, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { disablePush, enablePush, isPushEnabled, isWebPushSupported, sendChatPush } from '../lib/notifications';
 import { colorsFor, useThemeMode } from './theme';
 
-export const devVer: boolean = true;
+
+////////////////ITS RIGHT HERE///////////////////////////
+export const devVer: boolean = false;
+/////////////////////////////////////////////////////////
 
 const HomePage = () => {
   const mode = useThemeMode();
@@ -34,8 +38,11 @@ const HomePage = () => {
     }, [fade1, fade2])
   );
   const PROFILE_KEY = '@boxinggroupchat_profile_v1';
+  const PUSH_PREF_KEY = '@boxinggroupchat_push_enabled_v1';
   const [profileName, setProfileName] = useState('');
   const [profileColor, setProfileColor] = useState('#ffffff');
+  const [pushEnabled, setPushEnabled] = useState(false);
+  const [checkingPush, setCheckingPush] = useState(true);
 
   async function saveProfile(name?: string, color?: string) {
     try {
@@ -59,7 +66,46 @@ const HomePage = () => {
     }
   }
 
-  useEffect(() => { loadProfile(); }, []);
+  async function loadPushPreference() {
+    try {
+      if (Platform.OS !== 'web') { setCheckingPush(false); return; }
+      if (!isWebPushSupported()) { setCheckingPush(false); return; }
+      const stored = await AsyncStorage.getItem(PUSH_PREF_KEY);
+      const hasSub = await isPushEnabled();
+      setPushEnabled(stored === 'true' || hasSub);
+    } catch (e) {
+      console.warn('Failed to load push preference:', e);
+    } finally {
+      setCheckingPush(false);
+    }
+  }
+
+  async function togglePush(next: boolean) {
+    setPushEnabled(next);
+    await AsyncStorage.setItem(PUSH_PREF_KEY, next ? 'true' : 'false');
+    if (Platform.OS !== 'web') {
+      Alert.alert('Not supported', 'Push notifications are currently implemented for web only in this app.');
+      return;
+    }
+    if (!isWebPushSupported()) {
+      Alert.alert('Not supported', 'Your browser does not support Web Push.');
+      return;
+    }
+    try {
+      if (next) {
+        await enablePush();
+      } else {
+        await disablePush();
+      }
+    } catch (e: any) {
+      const msg = e?.message || String(e);
+      Alert.alert('Notifications', msg);
+      setPushEnabled(!next);
+      await AsyncStorage.setItem(PUSH_PREF_KEY, !next ? 'true' : 'false');
+    }
+  }
+
+  useEffect(() => { loadProfile(); loadPushPreference(); }, []);
   return (
     <View style={[styles.container, { backgroundColor: c.bg }]}>
       <Animated.Text style={[styles.text, { color: c.text, opacity: fade1 }]}>Welcome to</Animated.Text>
@@ -92,9 +138,27 @@ const HomePage = () => {
             ))}
         </View>
       </View>
+      <View style={{ width: '100%', paddingHorizontal: 16, marginBottom: 12 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Text style={{ color: c.text, marginRight: 12 }}>Web notifications</Text>
+          <Switch
+            value={pushEnabled}
+            disabled={checkingPush || Platform.OS !== 'web' || !isWebPushSupported()}
+            onValueChange={togglePush}
+          />
+        </View>
+        {Platform.OS === 'web' ? null : (
+          <Text style={{ color: c.text, marginTop: 6, fontSize: 12, opacity: 0.7 }}>
+            Push is only wired for web in this build.
+          </Text>
+        )}
+      </View>
       <Link style={[styles.button]} href={{ pathname: "/BoxingGroupchat/chat", params: { id: "1" } }}>
           <Text style={[styles.text, { color: c.text }]}>Open chat</Text>
       </Link>
+      {Platform.OS === 'web' && (
+        <></>
+      )}
       <Pressable style={[styles.button2]} onPress={() => router.push({ pathname: "/BoxingGroupchat/events" })}>
         <Text style={[styles.text, { color: c.text }]}>View events</Text>
       </Pressable>

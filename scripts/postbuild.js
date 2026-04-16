@@ -32,4 +32,22 @@ function rewrite() {
 }
 
 rewrite();
+// Ensure service worker and public assets copied to root of web-build
+try {
+  if (fs.existsSync('public')) {
+    // Copy only sw.js and icons (if present)
+    if (fs.existsSync('public/sw.js')) {
+      fs.copyFileSync('public/sw.js', 'web-build/sw.js');
+      console.log('[postbuild] Copied public/sw.js -> web-build/sw.js');
+    }
+    const iconsDir = 'public/icons';
+    if (fs.existsSync(iconsDir)) {
+      fs.mkdirSync('web-build/icons', { recursive: true });
+      fs.cpSync(iconsDir, 'web-build/icons', { recursive: true });
+      console.log('[postbuild] Copied public/icons -> web-build/icons');
+    }
+  }
+} catch (e) {
+  console.warn('[postbuild] Failed to copy public assets:', e.message);
+}
 console.log('[postbuild] Done.');
