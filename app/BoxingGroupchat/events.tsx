@@ -325,7 +325,7 @@ export default function Chat() {
       <Modal visible={modalVisible} animationType="fade" transparent>
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: c.card }]}>
-            <Text style={[styles.text1, { marginBottom: 8 }]}>New Event</Text>
+            <Text style={[styles.text1, { marginBottom: 8 }]}>Add Event</Text>
             <TextInput
               placeholder="What's the move?"
               placeholderTextColor={modeStr === "dark" ? "#ccc" : "#666"}
@@ -355,6 +355,8 @@ export default function Chat() {
               style={[styles.input, { color: c.text, height: 80 }]}
               multiline
             />
+
+            <Text style={[styles.text2, { marginTop: 4, marginBottom: 0, lineHeight: 20 }]}>When you post an event, everyone will be notified via email.</Text>
 
             <View
               style={{
